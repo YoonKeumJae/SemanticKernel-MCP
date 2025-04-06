@@ -1,0 +1,14 @@
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/SemanticKernelWithMCP
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/SemanticKernelWithMCP.deps.json
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/SemanticKernelWithMCP.runtimeconfig.json
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/SemanticKernelWithMCP.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/SemanticKernelWithMCP.pdb
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/SemanticKernelWithMCP.GeneratedMSBuildEditorConfig.editorconfig
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/SemanticKernelWithMCP.AssemblyInfoInputs.cache
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/SemanticKernelWithMCP.AssemblyInfo.cs
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/SemanticKernelWithMCP.csproj.CoreCompileInputs.cache
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/SemanticKernelWithMCP.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/refint/SemanticKernelWithMCP.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/SemanticKernelWithMCP.pdb
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/SemanticKernelWithMCP.genruntimeconfig.cache
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/ref/SemanticKernelWithMCP.dll
