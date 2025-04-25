@@ -3,7 +3,8 @@ using DotNetEnv;
 using OpenAI;
 using System.ClientModel;
 
-Env.Load();
+string envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+Env.Load(envPath);
 var token = Environment.GetEnvironmentVariable("GITHUB_ACCESS_TOKEN");
 
 if (string.IsNullOrEmpty(token))
