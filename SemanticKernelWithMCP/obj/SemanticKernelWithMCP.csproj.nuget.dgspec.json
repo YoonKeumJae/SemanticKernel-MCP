@@ -56,6 +56,10 @@
             "ModelContextProtocol": {
               "target": "Package",
               "version": "[0.1.0-preview.11, )"
+            },
+            "System.Windows.Extensions": {
+              "target": "Package",
+              "version": "[9.0.4, )"
             }
           },
           "imports": [

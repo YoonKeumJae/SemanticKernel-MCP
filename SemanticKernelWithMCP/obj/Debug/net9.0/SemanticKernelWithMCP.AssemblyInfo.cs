@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SemanticKernelWithMCP")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+35d3765279b0c46b4e80de2636217244853d2d15")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+366fdc63be28f86d176bda9bac844bbe35018bcd")]
 [assembly: System.Reflection.AssemblyProductAttribute("SemanticKernelWithMCP")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SemanticKernelWithMCP")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
