@@ -52,6 +52,10 @@
             "Microsoft.SemanticKernel": {
               "target": "Package",
               "version": "[1.47.0, )"
+            },
+            "ModelContextProtocol": {
+              "target": "Package",
+              "version": "[0.1.0-preview.11, )"
             }
           },
           "imports": [

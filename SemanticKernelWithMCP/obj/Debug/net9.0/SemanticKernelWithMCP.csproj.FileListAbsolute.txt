@@ -38,3 +38,14 @@
 /Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/SemanticKernelWithMCP.csproj.AssemblyReference.cache
 /Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/SemanticKernelWithMCP.sourcelink.json
 /Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/obj/Debug/net9.0/Semantic.AD780FBA.Up2Date
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/Microsoft.Extensions.AI.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/Microsoft.Extensions.Caching.Abstractions.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/Microsoft.Extensions.Diagnostics.Abstractions.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/Microsoft.Extensions.FileProviders.Abstractions.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/Microsoft.Extensions.Hosting.Abstractions.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/Microsoft.Extensions.Options.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/ModelContextProtocol.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/System.Diagnostics.DiagnosticSource.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/System.Net.ServerSentEvents.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/System.Text.Json.dll
+/Users/yoonkeumjae/dev/mctSummit2025/SemanticKernelWithMCP/bin/Debug/net9.0/System.Threading.Channels.dll
