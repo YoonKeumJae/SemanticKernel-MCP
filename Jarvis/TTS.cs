@@ -23,7 +23,7 @@ public static class TTS
         using (var client = new HttpClient())
         {
             client.DefaultRequestHeaders.Add("api-key", apiKey);
-            string trimString = Regex.Replace(responseText, "[^A-Za-z0-9 ]+", "");
+            string trimString = Regex.Replace(text, "[^A-Za-z0-9 ]+", "");
 
             var json = $@"{{
                 ""model"": ""tts-hd"",
@@ -80,7 +80,7 @@ public static class TTS
                 {
                     Console.WriteLine("현재 OS에서는 오디오 재생이 지원되지 않습니다.");
                 }
-
+                Console.WriteLine();
                 Console.WriteLine("오디오 재생 완료!");
             }
             else
