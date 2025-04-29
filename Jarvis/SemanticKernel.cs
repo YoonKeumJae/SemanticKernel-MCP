@@ -84,8 +84,7 @@ namespace Jarvis.SemanticKernel
                     this._history.AddAssistantMessage(responseText);
 
                     // TTS 출력
-                    string trimString = Regex.Replace(responseText, "[^A-Za-z0-9 ]+", "");
-                    await TTS.TTS.Speak(trimString);
+                    await TTS.TTS.Speak(responseText);
                     Console.WriteLine();
                 }
             }

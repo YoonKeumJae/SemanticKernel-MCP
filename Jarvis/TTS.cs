@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using DotNetEnv;
 
 namespace Jarvis.TTS;
@@ -22,10 +23,11 @@ public static class TTS
         using (var client = new HttpClient())
         {
             client.DefaultRequestHeaders.Add("api-key", apiKey);
+            string trimString = Regex.Replace(responseText, "[^A-Za-z0-9 ]+", "");
 
             var json = $@"{{
                 ""model"": ""tts-hd"",
-                ""input"": ""{text}"",
+                ""input"": ""{trimString}"",
                 ""voice"": ""alloy""
             }}";
 
