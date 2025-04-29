@@ -9,6 +9,7 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.Extensions.Logging;
 using DotNetEnv;
 using OpenAI;
+using System.Threading;
 
 using Jarvis.TTS;
 using Jarvis.MCP;
@@ -20,6 +21,10 @@ namespace Jarvis.SemanticKernel
     {
         private Kernel _kernel;
         private ChatHistory _history;
+        private Waker.Waker _waker;
+        private ManualResetEventSlim _commandWaitHandle = new ManualResetEventSlim(false);
+        private string _commandInput = string.Empty;
+        private Task? _wakerTask;
 
         public KernelApp()
         {
@@ -44,15 +49,32 @@ namespace Jarvis.SemanticKernel
                                         openAIClient: client,
                                         serviceId: "github")
                                 .Build();
+                                
+            // Waker 초기화
+            this._waker = new Waker.Waker();
+            this._waker.CommandDetected += OnCommandDetected;
+        }
+        
+        // Waker에서 명령이 감지되었을 때 실행되는 이벤트 핸들러
+        private void OnCommandDetected(object? sender, string command)
+        {
+            Console.WriteLine($"\n음성 명령 감지: {command}");
+            _commandInput = command;
+            _commandWaitHandle.Set(); // 대기 중인 스레드에 신호 보내기
         }
 
         public async Task StartProcessAsync()
         {
+            // 별도의 태스크로 Waker 시작 - 시작 시점에 바로 실행
+            Console.WriteLine("\nJarvis 키워드 인식을 시작합니다. 'Jarvis'라고 말한 후 명령을 입력하세요.");
+            _wakerTask = Task.Run(() => _waker.Start());
+            
+            // MCP 서비스 초기화
             var mcpService = new Jarvis.MCP.MCP(this._kernel);
 
             try
             {
-                // MCP 서버 시작
+                // MCP 서버 시작 (이 부분에서 Obsidian 경로 입력 요청)
                 await using var mcpClient = await mcpService.StartMcpServerAsync();
                 var settings = mcpService.CreatePromptSettings();
 
@@ -61,7 +83,30 @@ namespace Jarvis.SemanticKernel
                 while (true)
                 {
                     Console.Write("\nUser: ");
-                    string? input = Console.ReadLine();
+                    
+                    // 음성 명령 또는 키보드 입력 둘 중 하나를 대기
+                    string? input;
+                    
+                    // 비동기 입력을 위한 태스크 생성
+                    var readLineTask = Task.Run(() => Console.ReadLine());
+                    
+                    // 음성 명령이나 키보드 입력 중 먼저 완료되는 것을 대기
+                    if (await Task.WhenAny(readLineTask, Task.Run(() => {
+                        _commandWaitHandle.Wait();
+                        return true;
+                    })) == readLineTask)
+                    {
+                        // 키보드 입력이 완료됨
+                        input = await readLineTask;
+                    }
+                    else
+                    {
+                        // 음성 명령이 감지됨
+                        input = _commandInput;
+                        _commandWaitHandle.Reset(); // 다음 명령을 위해 리셋
+                        Console.WriteLine(input); // 사용자가 어떤 명령을 입력했는지 표시
+                    }
+                    
                     if (string.IsNullOrWhiteSpace(input))
                     {
                         break;
@@ -92,6 +137,11 @@ namespace Jarvis.SemanticKernel
             {
                 Console.WriteLine($"오류 발생: {ex.Message}");
                 Console.WriteLine(ex.StackTrace);
+            }
+            finally
+            {
+                // 프로그램 종료 시 필요한 정리 작업
+                Console.WriteLine("프로그램을 종료합니다...");
             }
         }
     }

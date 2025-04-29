@@ -11,28 +11,38 @@ namespace Jarvis.MCP;
 public class MCP
 {
     private readonly Kernel _kernel;
+    private string? _obsidianVaultPath;
 
     public MCP(Kernel kernel)
     {
         _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
     }
 
+    public void SetObsidianPath(string path)
+    {
+        _obsidianVaultPath = path;
+    }
+
     public async Task<IMcpClient> StartMcpServerAsync()
     {
-        Console.WriteLine("Obsidian 저장소 경로를 입력하세요 (입력하지 않으면 기본 경로 사용):");
-        string? obsidianVaultPath = Console.ReadLine();
-        if (string.IsNullOrWhiteSpace(obsidianVaultPath))
+        if (string.IsNullOrWhiteSpace(_obsidianVaultPath))
         {
-            // obsidianVaultPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            obsidianVaultPath = "/Users/yoonkeumjae/dev/obsidian";
-            Console.WriteLine($"기본 경로를 사용합니다: {obsidianVaultPath}");
+            Console.WriteLine("Obsidian 저장소 경로를 입력하세요 (입력하지 않으면 기본 경로 사용):");
+            string? obsidianVaultPath = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(obsidianVaultPath))
+            {
+                // obsidianVaultPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                obsidianVaultPath = "/Users/yoonkeumjae/dev/obsidian";
+                Console.WriteLine($"기본 경로를 사용합니다: {obsidianVaultPath}");
+            }
+            _obsidianVaultPath = obsidianVaultPath;
         }
 
         var transportOptions = new StdioClientTransportOptions
         {
             Name = "mcp-obsidian",
             Command = "npx",
-            Arguments = ["-y", "mcp-obsidian", obsidianVaultPath],
+            Arguments = ["-y", "mcp-obsidian", _obsidianVaultPath],
             WorkingDirectory = Directory.GetCurrentDirectory()
         };
 
