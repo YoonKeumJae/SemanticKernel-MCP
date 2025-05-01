@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace Jarvis.MCP;
 
@@ -27,15 +28,15 @@ public class MCP
     {
         if (string.IsNullOrWhiteSpace(_obsidianVaultPath))
         {
-            Console.WriteLine("Obsidian 저장소 경로를 입력하세요 (입력하지 않으면 기본 경로 사용):");
-            string? obsidianVaultPath = Console.ReadLine();
-            if (string.IsNullOrWhiteSpace(obsidianVaultPath))
-            {
+            // Console.WriteLine("Obsidian 저장소 경로를 입력하세요 (입력하지 않으면 기본 경로 사용):");
+            // string? obsidianVaultPath = Console.ReadLine();
+            // if (string.IsNullOrWhiteSpace(obsidianVaultPath))
+            // {
                 // obsidianVaultPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                obsidianVaultPath = "/Users/yoonkeumjae/dev/obsidian";
-                Console.WriteLine($"기본 경로를 사용합니다: {obsidianVaultPath}");
-            }
-            _obsidianVaultPath = obsidianVaultPath;
+                string defaultPath = "/Users/yoonkeumjae/dev/obsidian";
+                Console.WriteLine($"기본 경로를 사용합니다: {defaultPath}");
+                _obsidianVaultPath = defaultPath;
+            // }
         }
 
         var transportOptions = new StdioClientTransportOptions
@@ -66,11 +67,11 @@ public class MCP
         return mcpClient;
     }
 
-    public PromptExecutionSettings CreatePromptSettings()
+    public KernelArguments CreatePromptSettings()
     {
-        return new PromptExecutionSettings
+        return new KernelArguments
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(options: new() { RetainArgumentTypes = true })
+            { "FunctionChoiceBehavior", FunctionChoiceBehavior.Auto(options: new() { RetainArgumentTypes = true }) }
         };
     }
 }

@@ -13,6 +13,12 @@ namespace Jarvis.TTS;
 
 public static class TTS
 {
+    // 음성 재생 완료 이벤트를 위한 이벤트 핸들러 대리자 정의
+    public delegate void SpeakCompletedEventHandler(object? sender, EventArgs e);
+    
+    // 음성 재생 완료 이벤트
+    public static event SpeakCompletedEventHandler? SpeakCompleted;
+
     public static async Task Speak(string text)
     {
         string envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
@@ -82,10 +88,15 @@ public static class TTS
                 }
                 Console.WriteLine();
                 Console.WriteLine("오디오 재생 완료!");
+                
+                // 음성 재생 완료 이벤트 발생
+                SpeakCompleted?.Invoke(null, EventArgs.Empty);
             }
             else
             {
                 Console.WriteLine($"요청 실패: {response.StatusCode}");
+                // 실패해도 이벤트는 발생시킴 (처리를 재개하기 위해)
+                SpeakCompleted?.Invoke(null, EventArgs.Empty);
             }
         }
     }

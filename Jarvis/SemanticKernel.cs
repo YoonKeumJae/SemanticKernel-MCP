@@ -10,139 +10,172 @@ using Microsoft.Extensions.Logging;
 using DotNetEnv;
 using OpenAI;
 using System.Threading;
+using ModelContextProtocol.Client;
+using System.Collections.Generic;
 
 using Jarvis.TTS;
 using Jarvis.MCP;
-using Jarvis.Waker;
 
-namespace Jarvis.SemanticKernel
+namespace Jarvis.SemanticKernel;
+
+public class KernelApp
 {
-    public class KernelApp
+    private Kernel _kernel;
+    // ChatHistory를 static으로 변경하여 인스턴스 간에 공유되도록 함
+    private static ChatHistory? _history;
+    // 대화 히스토리 최대 저장 개수 (너무 많은 대화가 쌓이는 것을 방지)
+    private const int MaxHistoryMessages = 20;
+    private string _commandInput = string.Empty;
+    private Task? _wakerTask;
+    private KernelArguments? _promptSettings;
+    private IMcpClient? _mcpClient; // McpClient → IMcpClient 인터페이스로 변경
+    private IChatCompletionService? _chatCompletionService; // 채팅 완성 서비스 추가
+
+    public KernelApp()
     {
-        private Kernel _kernel;
-        private ChatHistory _history;
-        private Waker.Waker _waker;
-        private ManualResetEventSlim _commandWaitHandle = new ManualResetEventSlim(false);
-        private string _commandInput = string.Empty;
-        private Task? _wakerTask;
+        string envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+        Env.Load(envPath);
 
-        public KernelApp()
+        var token = Environment.GetEnvironmentVariable("GITHUB_ACCESS_TOKEN");
+        if (string.IsNullOrEmpty(token))
         {
-            string envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
-            Env.Load(envPath);
+            throw new InvalidOperationException("The GITHUB_ACCESS_TOKEN environment variable is not set.");
+        }
 
-            var token = Environment.GetEnvironmentVariable("GITHUB_ACCESS_TOKEN");
-            if (string.IsNullOrEmpty(token))
+        var client = new OpenAIClient(
+                    credential: new ApiKeyCredential(token),
+                    options: new OpenAIClientOptions { Endpoint = new Uri("https://models.inference.ai.azure.com") });
+
+        // ChatHistory가 아직 생성되지 않은 경우에만 새로 생성
+        if (_history == null)
+        {
+            _history = new ChatHistory();
+            // 시스템 메시지 추가 - AI 비서 역할 지정
+            _history.AddSystemMessage("당신은 Jarvis라는 이름의 AI 비서입니다. 사용자의 질문에 친절하고 정확하게 대답해주세요. 이전 대화 내용을 기억하고 맥락을 유지하세요.");
+            Console.WriteLine("새로운 대화 세션이 시작되었습니다.");
+        }
+        else
+        {
+            Console.WriteLine($"기존 대화 세션을 이어갑니다. (저장된 대화: {_history.Count}건)");
+        }
+
+        this._kernel = Kernel.CreateBuilder()
+                            .AddOpenAIChatCompletion(
+                                    modelId: "gpt-4o",
+                                    openAIClient: client,
+                                    serviceId: "github")
+                            .Build();
+                            
+        // 채팅 완성 서비스 가져오기
+        _chatCompletionService = this._kernel.GetRequiredService<IChatCompletionService>();
+    }
+
+    // KernelApp 초기화를 위한 비동기 메서드
+    public async Task InitializeAsync()
+    {
+        // MCP 서비스 초기화
+        var mcpService = new Jarvis.MCP.MCP(this._kernel);
+        // MCP 서버 시작 
+        _mcpClient = await mcpService.StartMcpServerAsync();
+        _promptSettings = mcpService.CreatePromptSettings();
+    }
+
+    public async Task StartProcessAsync(string prompt)
+    {
+        try
+        {
+            // 아직 초기화되지 않았다면 초기화 수행
+            if (_promptSettings == null)
             {
-                throw new InvalidOperationException("The GITHUB_ACCESS_TOKEN environment variable is not set.");
+                await InitializeAsync();
             }
 
-            var client = new OpenAIClient(
-                        credential: new ApiKeyCredential(token),
-                        options: new OpenAIClientOptions { Endpoint = new Uri("https://models.inference.ai.azure.com") });
-            
-            this._history = new ChatHistory();
-            
-            this._kernel = Kernel.CreateBuilder()
-                                .AddOpenAIChatCompletion(
-                                        modelId: "gpt-4o",
-                                        openAIClient: client,
-                                        serviceId: "github")
-                                .Build();
-                                
-            // Waker 초기화
-            this._waker = new Waker.Waker();
-            this._waker.CommandDetected += OnCommandDetected;
-        }
-        
-        // Waker에서 명령이 감지되었을 때 실행되는 이벤트 핸들러
-        private void OnCommandDetected(object? sender, string command)
-        {
-            Console.WriteLine($"\n음성 명령 감지: {command}");
-            _commandInput = command;
-            _commandWaitHandle.Set(); // 대기 중인 스레드에 신호 보내기
-        }
-
-        public async Task StartProcessAsync()
-        {
-            // 별도의 태스크로 Waker 시작 - 시작 시점에 바로 실행
-            Console.WriteLine("\nJarvis 키워드 인식을 시작합니다. 'Jarvis'라고 말한 후 명령을 입력하세요.");
-            _wakerTask = Task.Run(() => _waker.Start());
-            
-            // MCP 서비스 초기화
-            var mcpService = new Jarvis.MCP.MCP(this._kernel);
-
-            try
+            if (_chatCompletionService == null)
             {
-                // MCP 서버 시작 (이 부분에서 Obsidian 경로 입력 요청)
-                await using var mcpClient = await mcpService.StartMcpServerAsync();
-                var settings = mcpService.CreatePromptSettings();
+                throw new InvalidOperationException("채팅 완성 서비스가 초기화되지 않았습니다.");
+            }
 
-                Console.WriteLine("\n대화를 시작합니다. 종료하려면 빈 줄을 입력하세요.");
-
-                while (true)
+            // 히스토리가 최대 개수를 초과하면 가장 오래된 메시지 쌍(유저+어시스턴트)을 제거
+            if (_history != null && _history.Count >= MaxHistoryMessages)
+            {
+                // 시스템 메시지는 항상 유지해야 하므로, 메시지 유형 확인
+                if (_history.Count > 0 && _history[0].Role == AuthorRole.System)
                 {
-                    Console.Write("\nUser: ");
+                    // 시스템 메시지 다음부터 제거
+                    _history.RemoveAt(1); // 첫 번째 사용자 메시지 제거
                     
-                    // 음성 명령 또는 키보드 입력 둘 중 하나를 대기
-                    string? input;
+                    // 어시스턴트 메시지가 있는지 확인 후 제거
+                    if (_history.Count > 1)
+                    {
+                        _history.RemoveAt(1); // 첫 번째 어시스턴트 메시지 제거
+                    }
+                }
+                else
+                {
+                    // 시스템 메시지가 없으면 처음부터 제거
+                    _history.RemoveAt(0); // 사용자 메시지 제거
                     
-                    // 비동기 입력을 위한 태스크 생성
-                    var readLineTask = Task.Run(() => Console.ReadLine());
-                    
-                    // 음성 명령이나 키보드 입력 중 먼저 완료되는 것을 대기
-                    if (await Task.WhenAny(readLineTask, Task.Run(() => {
-                        _commandWaitHandle.Wait();
-                        return true;
-                    })) == readLineTask)
+                    if (_history.Count > 0)
                     {
-                        // 키보드 입력이 완료됨
-                        input = await readLineTask;
+                        _history.RemoveAt(0); // 어시스턴트 메시지 제거
                     }
-                    else
-                    {
-                        // 음성 명령이 감지됨
-                        input = _commandInput;
-                        _commandWaitHandle.Reset(); // 다음 명령을 위해 리셋
-                        Console.WriteLine(input); // 사용자가 어떤 명령을 입력했는지 표시
-                    }
-                    
-                    if (string.IsNullOrWhiteSpace(input))
-                    {
-                        break;
-                    }
-                    this._history.AddUserMessage(input);
+                }
 
-                    Console.Write("Assistant: ");
+                Console.WriteLine("오래된 대화 내용이 제거되었습니다.");
+            }
 
-                    // 스트리밍 응답 가져오기
-                    var responseStream = this._kernel.InvokePromptStreamingAsync(
-                        promptTemplate: input,
-                        arguments: new KernelArguments(settings) { { "ServiceId", "github" } });
+            // 현재 명령을 히스토리에 추가
+            _history?.AddUserMessage(prompt);
 
-                    string responseText = "";
-                    await foreach (var chunk in responseStream)
-                    {
-                        responseText += chunk;
-                        Console.Write(chunk);
-                    }
-                    this._history.AddAssistantMessage(responseText);
+            Console.Write("Assistant: ");
 
-                    // TTS 출력
-                    await TTS.TTS.Speak(responseText);
-                    Console.WriteLine();
+            // 채팅 완성 서비스를 사용하여 스트리밍 응답 가져오기
+            var settings = new OpenAIPromptExecutionSettings 
+            { 
+                MaxTokens = 1000,
+                Temperature = 0.7,
+                TopP = 0.95,
+                FrequencyPenalty = 0,
+                PresencePenalty = 0,
+            };
+
+            // 프롬프트 설정을 적용
+            var kernelArguments = new KernelArguments();
+            if (_promptSettings != null)
+            {
+                foreach (var item in _promptSettings)
+                {
+                    kernelArguments.Add(item.Key, item.Value);
                 }
             }
-            catch (Exception ex)
+            
+            // 이제 올바르게 ChatCompletionService를 사용하여 대화 맥락을 전달
+            var responseStream = _chatCompletionService.GetStreamingChatMessageContentsAsync(
+                _history!,
+                executionSettings: settings,
+                kernel: _kernel);
+
+            string responseText = "";
+            await foreach (var content in responseStream)
             {
-                Console.WriteLine($"오류 발생: {ex.Message}");
-                Console.WriteLine(ex.StackTrace);
+                if (content.Content != null)
+                {
+                    responseText += content.Content;
+                    Console.Write(content.Content);
+                }
             }
-            finally
-            {
-                // 프로그램 종료 시 필요한 정리 작업
-                Console.WriteLine("프로그램을 종료합니다...");
-            }
+
+            // 어시스턴트 응답을 히스토리에 추가
+            _history?.AddAssistantMessage(responseText);
+
+            // TTS 출력
+            await TTS.TTS.Speak(responseText);
+            Console.WriteLine();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"오류 발생: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
         }
     }
 }
