@@ -1,172 +1,162 @@
 using System;
 using System.IO;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Threading.Tasks;
-using System.Collections.Generic;
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
-using Pv;
+using Microsoft.CognitiveServices.Speech;
+using Microsoft.CognitiveServices.Speech.Audio;
 using DotNetEnv;
-using System.Text;
+using System.Threading;
 
 namespace Jarvis.Waker
 {
-    public class Waker 
+    public class Waker
     {
-        private readonly string? _accessKey;
-        private bool _isListeningForCommand = false;
-        private StringBuilder _commandBuffer = new StringBuilder();
-        private readonly WaveFileWriter? _commandRecorder;
-        private string _commandAudioPath;
-
+        // 음성 명령이 감지되었을 때 발생하는 이벤트
         public event EventHandler<string>? CommandDetected;
 
-        public Waker()
+        private CancellationTokenSource? _cancellationTokenSource;
+        private Task? _listeningTask;
+
+        public async Task Start()
+        {
+            _cancellationTokenSource = new CancellationTokenSource();
+            _listeningTask = Listen(_cancellationTokenSource.Token);
+            
+            // 비동기로 실행하고 반환
+            await Task.CompletedTask;
+        }
+
+        public async Task Stop()
+        {
+            if (_cancellationTokenSource != null)
+            {
+                _cancellationTokenSource.Cancel();
+                if (_listeningTask != null)
+                {
+                    await _listeningTask;
+                }
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = null;
+            }
+        }
+
+        private async Task Listen(CancellationToken cancellationToken)
         {
             string envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
             Env.Load(envPath);
-            _accessKey = Environment.GetEnvironmentVariable("PORCUPINE_API_KEY");
             
-            if (string.IsNullOrEmpty(_accessKey))
-            {
-                throw new InvalidOperationException("PORCUPINE_API_KEY environment variable is not set in .env file.");
-            }
+            // AZURE_API_KEY 사용 (.env 파일에서 이 키가 유효한 Speech API 키로 보임)
+            var key = Environment.GetEnvironmentVariable("AZURE_API_KEY");
             
-            // 명령 녹음을 위한 임시 파일 경로
-            _commandAudioPath = Path.Combine(Path.GetTempPath(), "jarvis_command.wav");
-        }
-
-        public void Start()
-        {
-            // 1) Porcupine 엔진 초기화 (Jarvis 키워드만 감지)
-            using var porcupine = Porcupine.FromBuiltInKeywords(
-                _accessKey,
-                new List<BuiltInKeyword> { BuiltInKeyword.JARVIS }
-            );
-
-            // 2) 마이크 입력 초기화 (NAudio 사용)
-            var waveIn = new WaveInEvent
+            if (string.IsNullOrEmpty(key))
             {
-                WaveFormat = new WaveFormat(porcupine.SampleRate, 16, 1),
-                BufferMilliseconds = 20
-            };
-
-            Console.WriteLine("녹음을 시작합니다. 마이크에 'Jarvis'라고 말해보세요...");
-
-            short[] audioBuffer = new short[porcupine.FrameLength];
-            int audioBufferIndex = 0;
-            
-            // 명령 녹음을 위한 버퍼와 카운터
-            int silenceCounter = 0;
-            WaveFileWriter? commandRecorder = null;
-
-            waveIn.DataAvailable += (sender, e) =>
-            {
-                // 바이트 버퍼를 16비트 short로 변환
-                for (int i = 0; i < e.BytesRecorded; i += 2)
-                {
-                    if (audioBufferIndex >= audioBuffer.Length)
-                    {
-                        // 버퍼가 찼으면 키워드 감지 처리
-                        int result = porcupine.Process(audioBuffer);
-                        if (result == 0 && !_isListeningForCommand)  // Jarvis 인덱스는 0
-                        {
-                            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 🔔 Jarvis detected! 명령을 말씀해주세요...");
-                            _isListeningForCommand = true;
-                            silenceCounter = 0;
-                            
-                            // 명령 녹음 시작
-                            if (commandRecorder != null)
-                            {
-                                commandRecorder.Dispose();
-                            }
-                            if (File.Exists(_commandAudioPath))
-                            {
-                                File.Delete(_commandAudioPath);
-                            }
-                            commandRecorder = new WaveFileWriter(_commandAudioPath, waveIn.WaveFormat);
-                        }
-                        audioBufferIndex = 0;
-                    }
-
-                    if (i + 1 < e.BytesRecorded)
-                    {
-                        short sample = (short)((e.Buffer[i + 1] << 8) | e.Buffer[i]);
-                        audioBuffer[audioBufferIndex++] = sample;
-                        
-                        // 명령 모드일 때 오디오 저장
-                        if (_isListeningForCommand && commandRecorder != null)
-                        {
-                            commandRecorder.WriteSample(sample);
-                            
-                            // 음성 활동 감지 (간단한 음량 기반)
-                            if (Math.Abs(sample) < 500) // 소리가 작으면 침묵으로 간주
-                            {
-                                silenceCounter++;
-                            }
-                            else
-                            {
-                                silenceCounter = 0; // 소리가 감지되면 카운터 리셋
-                            }
-                            
-                            // 약 2초 동안 침묵이 계속되면 명령 입력 종료
-                            if (silenceCounter > porcupine.SampleRate * 2)
-                            {
-                                Console.WriteLine("명령 입력이 완료되었습니다. 처리 중...");
-                                _isListeningForCommand = false;
-                                
-                                // 명령 녹음 종료 및 파일 저장
-                                commandRecorder.Dispose();
-                                commandRecorder = null;
-                                
-                                // 여기서 명령 오디오 파일을 STT로 전송하거나 처리
-                                ProcessCommandAudio();
-                            }
-                        }
-                    }
-                }
-            };
-
-            // 녹음 시작
-            waveIn.StartRecording();
-
-            Console.WriteLine("아무 키나 누르면 종료합니다...");
-            Console.ReadKey();
-
-            // 정리
-            waveIn.StopRecording();
-            waveIn.Dispose();
-        }
-        
-        private void ProcessCommandAudio()
-        {
-            if (!File.Exists(_commandAudioPath))
-            {
-                Console.WriteLine("명령 오디오 파일이 없습니다.");
+                Console.WriteLine("Error: Azure Speech API 키가 .env 파일에 설정되지 않았습니다.");
+                Console.WriteLine("AZURE_API_KEY 환경 변수를 확인하세요.");
                 return;
             }
             
-            // 여기서는 간단한 예시로 파일 존재 확인만 하고 이벤트를 발생시킵니다.
-            // 실제 구현에서는 STT 서비스를 사용하여 오디오를 텍스트로 변환해야 합니다.
-            Console.WriteLine($"명령 오디오가 저장되었습니다: {_commandAudioPath}");
+            Console.WriteLine("Azure Speech 서비스에 연결 중...");
             
-            // 예시 명령 (실제로는 STT로 변환된 텍스트가 들어갑니다)
-            string commandText = "사용자 명령 (STT로 변환 필요)";
-            
-            // 명령 감지 이벤트 발생
-            CommandDetected?.Invoke(this, commandText);
+            try
+            {
+                // 1) SpeechConfig 생성 - 리전은 .env에 없으므로 일반적인 리전 사용
+                var speechConfig = SpeechConfig.FromSubscription(key, "swedencentral");
+                speechConfig.SpeechRecognitionLanguage = "ko-KR"; // 한국어 인식
+                
+                // 2) AudioConfig 인스턴스화
+                var audioConfig = AudioConfig.FromDefaultMicrophoneInput();
+                
+                // 3) SpeechRecognizer 생성
+                using var speechRecognizer = new SpeechRecognizer(speechConfig, audioConfig);
+                
+                // 4) 디버깅을 위한 이벤트 등록
+                speechRecognizer.SessionStarted += (s, e) => {
+                    Console.WriteLine("세션 시작됨");
+                };
+                
+                speechRecognizer.SessionStopped += (s, e) => {
+                    Console.WriteLine("세션 종료됨");
+                };
+                
+                // 5) 인식 결과 이벤트 등록
+                speechRecognizer.Recognized += (s, e) =>
+                {
+                    if (e.Result.Reason == ResultReason.RecognizedSpeech)
+                    {
+                        Console.WriteLine($"[인식 텍스트]: {e.Result.Text}");
+                        
+                        // "Hey Jarvis" 또는 "하이 자비스" 등의 키워드가 포함된 경우 (간단한 구현)
+                        string lowerText = e.Result.Text.ToLower();
+                        if (lowerText.Contains("hey jarvis") || lowerText.Contains("하이 자비스") || 
+                            lowerText.Contains("자비스"))
+                        {
+                            Console.WriteLine("[Wake Word 감지됨]");
+                            
+                            // 다음 명령 대기
+                            Console.WriteLine("음성 인식 모드 전환: 말하세요...");
+                            
+                            // 여기서는 다음 명령을 기다리기 위해 간단히 딜레이를 추가
+                            Task.Delay(1000).Wait();
+                            
+                            // 실제로는 여기서 다른 명령을 기다려야 함
+                            // 이 예제에서는 다음 음성 인식 결과를 명령으로 처리
+                        }
+                        else
+                        {
+                            // 웨이크 워드가 감지된 후의 명령으로 처리
+                            CommandDetected?.Invoke(this, e.Result.Text);
+                        }
+                    }
+                };
+
+                // 연결 오류 이벤트 등록
+                speechRecognizer.Canceled += (s, e) =>
+                {
+                    Console.WriteLine($"인식 취소됨: {e.Reason}");
+                    if (e.Reason == CancellationReason.Error)
+                    {
+                        Console.WriteLine($"오류 코드: {e.ErrorCode}");
+                        Console.WriteLine($"오류 상세: {e.ErrorDetails}");
+                    }
+                };
+
+                // 6) 연속 인식 시작
+                Console.WriteLine("연속 음성 인식 시작 중...");
+                await speechRecognizer.StartContinuousRecognitionAsync();
+                
+                Console.WriteLine("음성 인식 모드: 'Hey, Jarvis'를 말하세요...");
+                
+                try 
+                {
+                    // 취소 토큰이 호출될 때까지 대기
+                    await Task.Delay(-1, cancellationToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    // 정상적인 취소 처리
+                }
+                finally 
+                {
+                    await speechRecognizer.StopContinuousRecognitionAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"음성 인식 초기화 중 오류 발생: {ex.Message}");
+                Console.WriteLine(ex.StackTrace);
+            }
         }
-        
-        // 명령 검출 메서드 (실제 STT 서비스 사용 예시)
-        public async Task<string> ConvertSpeechToText()
+
+        // Controller.cs에서 호출하는 정적 메서드
+        public static async Task Listen()
         {
-            // 여기에 실제 STT 서비스를 사용하여 _commandAudioPath 오디오를 텍스트로 변환하는 코드 구현
-            // 예: Azure Speech Service, Google Speech-to-Text 등
+            var waker = new Waker();
+            await waker.Start();
             
-            // 임시 구현 (실제로는 STT 서비스 사용)
-            await Task.Delay(500); // STT 처리 시간 시뮬레이션
-            return "이것은 예시 명령입니다";
+            // 종료 대기
+            Console.WriteLine("엔터 키를 눌러 종료합니다.");
+            Console.ReadLine();
+            
+            await waker.Stop();
         }
     }
 }

@@ -7,6 +7,7 @@ using System;
 
 using Jarvis.SemanticKernel;
 using Jarvis.MCP;
+using Jarvis.Controller;
 
 public class Program
 {
@@ -16,11 +17,14 @@ public class Program
         {
             Console.WriteLine("Jarvis 시스템을 초기화합니다...");
             
-            // SemanticKernel 앱 초기화
-            KernelApp kernelApp = new KernelApp();
+            Jarvis.Controller.Controller controller = new Jarvis.Controller.Controller();
+            await controller.RunAsync();
             
-            // 대화 시작 및 Jarvis 키워드 감지 시작
-            await kernelApp.StartProcessAsync();
+            // 주석 처리된 코드는 나중에 구현할 수 있도록 유지
+            // // SemanticKernel 앱 초기화
+            // KernelApp kernelApp = new KernelApp();
+            // // 대화 시작 및 Jarvis 키워드 감지 시작
+            // await kernelApp.StartProcessAsync();
         }
         catch (Exception ex)
         {
